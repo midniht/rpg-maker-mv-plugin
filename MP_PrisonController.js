@@ -120,10 +120,11 @@
     getActorIdFromEventName(eventId, atPrison = false) {
       return $dataActors
         .filter(
-          (a) =>
-            a && a.name === this.getActorNameFromEventName(eventId, atPrison)
+          (actor) =>
+            actor &&
+            actor.name === this.getActorNameFromEventName(eventId, atPrison)
         )
-        .map((a) => a.id)
+        .map((actor) => actor.id)
         .pop();
     }
 

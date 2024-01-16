@@ -15,6 +15,7 @@
  * Plugin Command:
  *   MP_Dialogue init             # 初始化插件（仅在游戏开始时执行一次）
  *   MP_Dialogue say 要说的话    # 弹出带立绘的角色对白
+ *   MP_Dialogue clearImages      # 清除存在的所有立绘
  */
 
 /**
@@ -60,6 +61,9 @@
     constructor(config = {}) {
       this.version = "0.3.0";
       this._prefix = "MP_DialogueManager";
+      this._characterData = {}; // 游戏角色数据
+      this._imageIdOffset = 77; // 图片 ID 偏移量 防止和其他图片冲突
+      this._imageCursor = this._imageIdOffset; // 图片 ID 只能在 1 - 100 以内
 
       // 加载参数
       const temp = Object.entries(config);
@@ -67,8 +71,6 @@
       for (let [key, value] of temp) {
         this._config[key] = value;
       }
-
-      this._characterData = {};
 
       this.log(`插件实例化成功 当前版本 v${this.version}`);
     }
@@ -84,56 +86,88 @@
     }
 
     loadCharacterData() {
-      // TODO 读取游戏角色数据
+      $dataActors.map((actor) => {
+        if (actor) {
+          this._characterData[actor.id] = {
+            id: actor.id, // 角色 ID
+            name: actor.name, // 角色名称
+            nickname: actor.nickname, // 角色昵称
+            classId: actor.classId, // 职业 ID
+            profile: actor.profile, // 简介
+            faceName: actor.faceName, // 脸图文件名
+            faceIndex: actor.faceIndex, // 脸图序号
+            characterName: actor.characterName, // 行走图文件名
+            characterIndex: actor.characterIndex, // 行走图序号
+            traits: {}, // 特性 (暂未使用)
+            note: actor.note, // 备注
+            images: {}, // 立绘
+          };
+        }
+      });
       return true;
     }
 
     initPlugin() {
       this.loadCharacterData();
+      this.log("插件初始化成功 读取到角色数据", this._characterData);
     }
 
-    showCharacterPortrait(actor) {
+    getCharacterData(actor) {
       if (typeof actor === "string") {
         actor = Object.entries(this._characterData)
-          .filter((k, v) => [k, v])
-          .pop();
+          .filter((actorData, _) => actorData[1].name === actor)
+          .pop()[1];
       } else if (typeof actor === "number") {
         actor = Object.entries(this._characterData)
-          .filter((k, v) => [k, v])
-          .pop();
+          .filter((actorData, _) => actorData[1].id === actor)
+          .pop()[1];
       } else {
         throw new TypeError(
           `${thisPluginInstance._prefix}: 指定的角色参数 (${actor}) 类型错误 需要角色 ID 或角色名`
         );
       }
-      console.warn("todo 从插件数据中获取绑定好的角色信息(立绘等)", actor);
-      return false;
+      return actor;
+    }
+
+    showCharacterPortrait(characterData, portraitSuffix) {
+      this._imageCursor += 1;
+      $gameScreen.showPicture(
+        this._imageCursor, // 图片编号 (ID)
+        portraitSuffix + characterData.name, // 图像文件名 (不含扩展名)
+        0, // 原点: 0(左上), 1(中心)
+        0, // 直接指定坐标的 X (单位为像素 px)
+        Graphics.boxWidth / 10, // 直接指定坐标的 Y (单位为像素 px)
+        50, // 缩放率的横向宽度 (单位百分比)
+        50, // 缩放率的纵向高度 (单位百分比)
+        255, // 合成方式的不透明度 (0 - 255)
+        0 // 合成方式: 0(正常), 1(叠加), 2(正片叠底), 3(滤色)
+      );
+      return true;
     }
 
     clearCharacterPortrait() {
-      return false;
+      for (; this._imageCursor > this._imageIdOffset; this._imageCursor--) {
+        $gameScreen.erasePicture(this._imageCursor);
+      }
+      return true;
     }
 
     showDialogue(gameInterpreter, text = []) {
       text = text.length === 0 ? ["我是 %%%。"] : text;
-      const actorName = $gameMap
-        .event(gameInterpreter.eventId())
-        .event()
-        .name.split("的")[0];
-
-      // 显示立绘
-      this.showCharacterPortrait(actorName);
-
-      // 显示台词
-      const talkerName = `\\C[6]${actorName}\\C[0]`;
-      $gameMessage.add(
-        `\\}「${talkerName}」\\{\n${text.join(" ").replace(/%%%/g, talkerName)}`
+      const currentActor = this.getCharacterData(
+        $gameMap.event(gameInterpreter.eventId()).event().name.split("的")[0]
       );
 
-      // TODO 显示对话选项并进行对应处理
+      // 显示立绘
+      this.showCharacterPortrait(currentActor, "MyGO_立绘_");
 
-      // 清除立绘
-      this.clearCharacterPortrait();
+      // 显示台词
+      const speakerName = `\\C[6]${currentActor.name}\\C[0]`;
+      $gameMessage.add(
+        `\\}「${speakerName}」\\{\n${text
+          .join(" ")
+          .replace(/%%%/g, speakerName)}`
+      );
 
       return true;
     }
@@ -159,7 +193,8 @@
         case "say":
           thisPluginInstance.showDialogue(this, [...args.slice(1)]);
           break;
-        case "todo":
+        case "clearImages":
+          thisPluginInstance.clearCharacterPortrait();
           break;
         default:
           thisPluginInstance.log("触发的插件指令参数", args);
