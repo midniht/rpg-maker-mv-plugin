@@ -108,16 +108,23 @@
      * @function getActorNameFromEventNameByEventId
      * @param {number} eventId
      * @param {boolean} atPrison
+     * @param {boolean} strictMode
      * @returns {string} actorName
      */
-    getActorNameFromEventNameByEventId(eventId, atPrison = false) {
+    getActorNameFromEventNameByEventId(
+      eventId,
+      atPrison = false,
+      strictMode = true
+    ) {
       return $gameMap
         .event(eventId)
         .event()
         .name.split(
-          atPrison
-            ? this._config["prison_actor_event_suffix"]
-            : this._config["free_actor_event_suffix"]
+          strictMode
+            ? atPrison
+              ? this._config["prison_actor_event_suffix"]
+              : this._config["free_actor_event_suffix"]
+            : "的"
         )[0];
     }
 
@@ -125,23 +132,44 @@
      * @function getActorIdFromEventNameByEventId
      * @param {number} eventId
      * @param {boolean} atPrison
+     * @param {boolean} strictMode
      * @returns {number} actorId
      */
-    getActorIdFromEventNameByEventId(eventId, atPrison = false) {
-      return $dataActors
+    getActorIdFromEventNameByEventId(
+      eventId,
+      atPrison = false,
+      strictMode = true
+    ) {
+      const actorId = $dataActors
         .filter(
           (actor) =>
             actor &&
             actor.name ===
-              this.getActorNameFromEventNameByEventId(eventId, atPrison)
+              this.getActorNameFromEventNameByEventId(
+                eventId,
+                atPrison,
+                strictMode
+              )
         )
         .map((actor) => actor.id)
         .pop();
+      if (!actorId) {
+        throw new RangeError(
+          `${this._prefix}: 试图通过事件名称 "${
+            $gameMap.event(eventId).event().name
+          }" 匹配角色数据失败 请确认当前地图场景的确${
+            atPrison ? "" : "不"
+          }是监牢(本事件执行的插件指令 handleShowCharacter 的参数)`
+        );
+      }
+      return actorId;
     }
 
     joinParty(gameInterpreter) {
       const actorId = this.getActorIdFromEventNameByEventId(
-        gameInterpreter.eventId()
+        gameInterpreter.eventId(),
+        undefined,
+        false
       );
 
       // 入队前附加状态
@@ -216,15 +244,6 @@
      */
     canShowCharacter(eventId, atPrison = false) {
       const actorId = this.getActorIdFromEventNameByEventId(eventId, atPrison);
-      if (!actorId) {
-        throw new RangeError(
-          `${this._prefix}: 试图通过事件名称 "${
-            $gameMap.event(eventId).event().name
-          }" 匹配角色数据失败 请确认当前地图场景的确${
-            atPrison ? "" : "不"
-          }是监牢(本事件执行的插件指令 handleShowCharacter 的参数)`
-        );
-      }
       const actor = $gameActors.actor(actorId);
       if (!actor) {
         console.warn("当前所有角色数据", $gameActors);
