@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Dialogue Manager
- * v0.3.0
+ * v0.3.1
  *
  * @author 深宵(Miyoi)
  *
@@ -13,9 +13,14 @@
  * 角色对话管理器
  *
  * Plugin Command:
- *   MP_Dialogue init             # 初始化插件（仅在游戏开始时执行一次）
- *   MP_Dialogue say 要说的话    # 弹出带立绘的角色对白
- *   MP_Dialogue clearImages      # 清除存在的所有立绘
+ *   MP_Dialogue init                     # 初始化插件（仅在开始时执行一次）
+ *   MP_Dialogue say [立绘差分] [台词]  # 弹出带立绘的角色对白
+ *   MP_Dialogue clearImages              # 清除存在的所有立绘
+ *
+ * @param 立绘图片文件名前缀
+ * @desc 指定立绘图片文件名的统一前缀（如果有的话）。
+ * @type string
+ * @default
  */
 
 /**
@@ -59,18 +64,16 @@
      * @param {*} config 传入的配置
      */
     constructor(config = {}) {
-      this.version = "0.3.0";
+      this.version = "0.3.1";
       this._prefix = "MP_DialogueManager";
       this._characterData = {}; // 游戏角色数据
       this._imageIdOffset = 77; // 图片 ID 偏移量 防止和其他图片冲突
       this._imageCursor = this._imageIdOffset; // 图片 ID 只能在 1 - 100 以内
 
       // 加载参数
-      const temp = Object.entries(config);
       this._config = {};
-      for (let [key, value] of temp) {
-        this._config[key] = value;
-      }
+      this._config["portrait_prefix"] =
+        config["Portrait File Prefix"] || config["立绘图片文件名前缀"];
 
       this.log(`插件实例化成功 当前版本 v${this.version}`);
     }
@@ -81,7 +84,7 @@
      * @returns 根据需要变化
      */
     test() {
-      this.log(`当前配置为`, this._config, this._chosenActors);
+      this.log(`当前配置为`, this._config);
       return "测试完成";
     }
 
@@ -129,11 +132,19 @@
       return actor;
     }
 
-    showCharacterPortrait(characterData, portraitSuffix) {
+    showCharacterPortrait(characterData, portraitSuffix = "") {
+      this.log(portraitSuffix);
+      const pictureFileName = [
+        this._config["portrait_prefix"],
+        characterData.name,
+        portraitSuffix,
+      ]
+        .filter((str) => typeof str === "string" && str !== "")
+        .join("_");
       this._imageCursor += 1;
       $gameScreen.showPicture(
         this._imageCursor, // 图片编号 (ID)
-        portraitSuffix + characterData.name, // 图像文件名 (不含扩展名)
+        pictureFileName, // 图像文件名 (不含扩展名)
         0, // 原点: 0(左上), 1(中心)
         0, // 直接指定坐标的 X (单位为像素 px)
         Graphics.boxWidth / 10, // 直接指定坐标的 Y (单位为像素 px)
@@ -152,22 +163,20 @@
       return true;
     }
 
-    showDialogue(gameInterpreter, text = []) {
-      text = text.length === 0 ? ["我是 %%%。"] : text;
+    showDialogue(gameInterpreter, ...args) {
       const currentActor = this.getCharacterData(
         $gameMap.event(gameInterpreter.eventId()).event().name.split("的")[0]
       );
 
       // 显示立绘
-      this.showCharacterPortrait(currentActor, "MyGO_立绘_");
+      this.log("显示立绘", args);
+      this.showCharacterPortrait(currentActor, args[0]);
 
       // 显示台词
+      const inputText = args.length <= 1 ? ["我是 %%%。"] : [...args.slice(1)];
       const speakerName = `\\C[6]${currentActor.name}\\C[0]`;
-      $gameMessage.add(
-        `\\}「${speakerName}」\\{\n${text
-          .join(" ")
-          .replace(/%%%/g, speakerName)}`
-      );
+      const parsedText = inputText.join(" ").replace(/%%%/g, speakerName);
+      $gameMessage.add(`\\}「${speakerName}」\\{\n${parsedText}`);
 
       return true;
     }
@@ -191,7 +200,7 @@
           thisPluginInstance.initPlugin();
           break;
         case "say":
-          thisPluginInstance.showDialogue(this, [...args.slice(1)]);
+          thisPluginInstance.showDialogue(this, ...args.slice(1));
           break;
         case "clearImages":
           thisPluginInstance.clearCharacterPortrait();
