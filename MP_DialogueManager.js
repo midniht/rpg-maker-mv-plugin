@@ -133,7 +133,6 @@
     }
 
     showCharacterPortrait(characterData, portraitSuffix = "") {
-      this.log(portraitSuffix);
       const pictureFileName = [
         this._config["portrait_prefix"],
         characterData.name,
@@ -169,7 +168,6 @@
       );
 
       // 显示立绘
-      this.log("显示立绘", args);
       this.showCharacterPortrait(currentActor, args[0]);
 
       // 显示台词
@@ -206,7 +204,7 @@
           thisPluginInstance.clearCharacterPortrait();
           break;
         default:
-          thisPluginInstance.log("触发的插件指令参数", args);
+          thisPluginInstance.log("未定义的插件指令", args);
           break;
       }
     }

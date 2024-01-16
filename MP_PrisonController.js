@@ -14,6 +14,18 @@
  * Plugin Command:
  *   MP_PrisonControll handleShowCharacter 1    # 当前场景是监牢，处理是否显示角色
  *   MP_PrisonControll handleShowCharacter 0    # 当前场景不是监牢，处理是否显示角色
+ *   MP_PrisonControll joinParty             # 当前事件的角色加入队伍
+ *   MP_PrisonControll leaveParty              # 当前事件的角色离开队伍
+ *
+ * @param 指定「队伍中」状态
+ * @desc 绑定表示「角色当前正处于队伍中」的「状态」。
+ * @type state
+ * @default
+ *
+ * @param 世界角色事件后缀
+ * @desc 位于世界中时，代表「角色」的事件名称后缀。
+ * @type string
+ * @default 的世界位置
  *
  * @param 指定「监禁中」状态
  * @desc 绑定表示「角色当前正处于监禁中」的「状态」。
@@ -24,11 +36,6 @@
  * @desc 位于监牢中时，代表「角色」的事件名称后缀。
  * @type string
  * @default 的监牢位置
- *
- * @param 世界角色事件后缀
- * @desc 位于世界中时，代表「角色」的事件名称后缀。
- * @type string
- * @default 的世界位置
  */
 
 (function () {
@@ -73,13 +80,16 @@
 
       // 加载参数
       this._config = {};
+      this._config["in_party_state"] = Number(
+        config["in_party_state"] || config["指定「队伍中」状态"]
+      );
+      this._config["free_actor_event_suffix"] =
+        config["free_actor_event_suffix"] || config["世界角色事件后缀"];
       this._config["imprison_state"] = Number(
         config["imprison_state"] || config["指定「监禁中」状态"]
       );
       this._config["prison_actor_event_suffix"] =
         config["prison_actor_event_suffix"] || config["监牢角色事件后缀"];
-      this._config["free_actor_event_suffix"] =
-        config["free_actor_event_suffix"] || config["世界角色事件后缀"];
 
       this.log(`插件实例化成功 当前版本 v${this.version}`);
     }
@@ -95,12 +105,12 @@
     }
 
     /**
-     * @function getActorNameFromEventName
+     * @function getActorNameFromEventNameByEventId
      * @param {number} eventId
      * @param {boolean} atPrison
      * @returns {string} actorName
      */
-    getActorNameFromEventName(eventId, atPrison = false) {
+    getActorNameFromEventNameByEventId(eventId, atPrison = false) {
       return $gameMap
         .event(eventId)
         .event()
@@ -112,20 +122,90 @@
     }
 
     /**
-     * @function getActorIdFromEventName
+     * @function getActorIdFromEventNameByEventId
      * @param {number} eventId
      * @param {boolean} atPrison
      * @returns {number} actorId
      */
-    getActorIdFromEventName(eventId, atPrison = false) {
+    getActorIdFromEventNameByEventId(eventId, atPrison = false) {
       return $dataActors
         .filter(
           (actor) =>
             actor &&
-            actor.name === this.getActorNameFromEventName(eventId, atPrison)
+            actor.name ===
+              this.getActorNameFromEventNameByEventId(eventId, atPrison)
         )
         .map((actor) => actor.id)
         .pop();
+    }
+
+    joinParty(gameInterpreter) {
+      const actorId = this.getActorIdFromEventNameByEventId(
+        gameInterpreter.eventId()
+      );
+
+      // 入队前附加状态
+      $gameActors.actor(actorId).addState(this._config["in_party_state"]);
+
+      // 执行入队操作
+      $gameParty.addActor(actorId);
+
+      // 可以换成 入队后附加状态 写法如下
+      /*
+      this.log(
+        "入队后附加状态:",
+        $gameActors.actor(actorId) ===
+          $gameParty
+            .members()
+            .filter((actor) => actor.actorId() === actorId)
+            .pop()
+      );
+      */
+
+      return false;
+    }
+
+    leaveParty(gameInterpreter) {
+      // TODO 离队前解除状态
+      // this.log("离队时 公共事件:", gameInterpreter);
+      // 难以在公共事件中获取到对应的 actorID (调用该公共事件的出处)
+      // 因此在 离开队伍 技能中直接提前设置好状态 再调用公共事件
+      // $gameActors.actor(actorID).eraseState(this._config["in_party_state"]);
+
+      // 执行离队操作
+      this.log(
+        "当前队友的状态:",
+        $gameParty.aliveMembers().map((actor) =>
+          [
+            actor.name(),
+            actor
+              .states()
+              .map((state) => state.name)
+              .join(", "),
+          ].join(": ")
+        )
+      );
+      $gameParty
+        .members()
+        .slice(1) // 排除主角
+        .filter(
+          (actor) =>
+            !actor
+              .states()
+              .map((state) => state.id)
+              .includes(this._config["in_party_state"])
+        )
+        .map((actor) => $gameParty.removeActor(actor.actorId()));
+
+      return false;
+    }
+
+    arrestActor() {
+      return false;
+    }
+
+    releaseActor() {
+      return false;
     }
 
     /**
@@ -135,12 +215,14 @@
      * @returns
      */
     canShowCharacter(eventId, atPrison = false) {
-      const actorId = this.getActorIdFromEventName(eventId, atPrison);
+      const actorId = this.getActorIdFromEventNameByEventId(eventId, atPrison);
       if (!actorId) {
         throw new RangeError(
-          `${this._prefix}: 试图通过事件名称 ${
+          `${this._prefix}: 试图通过事件名称 "${
             $gameMap.event(eventId).event().name
-          } 匹配角色数据失败`
+          }" 匹配角色数据失败 请确认当前地图场景的确${
+            atPrison ? "" : "不"
+          }是监牢(本事件执行的插件指令 handleShowCharacter 的参数)`
         );
       }
       const actor = $gameActors.actor(actorId);
@@ -170,16 +252,18 @@
         /**
          * @todo 使用代码自动修改事件页绑定的图像
          */
-        // console.log($gameMap.event(gameInterpreter.eventId()));
-        // $gameMap
-        //   .event(gameInterpreter.eventId())
-        //   .setImage(
-        //     $gameMap
-        //       .event(gameInterpreter.eventId())
-        //       .event()
-        //       .name.split("的")[0],
-        //     0
-        //   );
+        /*
+        console.log($gameMap.event(gameInterpreter.eventId()));
+        $gameMap
+          .event(gameInterpreter.eventId())
+          .setImage(
+            $gameMap
+              .event(gameInterpreter.eventId())
+              .event()
+              .name.split("的")[0],
+            0
+          );
+        */
 
         return true;
       } else {
@@ -203,6 +287,12 @@
           `${thisPluginInstance._prefix}: 插件命令的参数错误 ${args}`
         );
       switch (args[0]) {
+        case "joinParty":
+          thisPluginInstance.joinParty(this);
+          break;
+        case "leaveParty":
+          thisPluginInstance.leaveParty(this);
+          break;
         case "canShowCharacter":
           thisPluginInstance.log("触发的插件指令参数", args);
           thisPluginInstance.log(
@@ -220,7 +310,7 @@
           );
           break;
         default:
-          thisPluginInstance.log("触发的插件指令参数", args);
+          thisPluginInstance.log("未定义的插件指令", args);
           break;
       }
     }
