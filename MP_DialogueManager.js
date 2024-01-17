@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Dialogue Manager
- * v0.3.1
+ * v0.3.2
  *
  * @author 深宵(Miyoi)
  *
@@ -55,7 +55,7 @@
      * @returns
      */
     log(...args) {
-      console.log(`${this.now()} [${this._prefix}]`, ...args);
+      console.log(`${this.now()} [${this.pluginName}]`, ...args);
       return;
     }
 
@@ -64,8 +64,8 @@
      * @param {*} config 传入的配置
      */
     constructor(config = {}) {
-      this.version = "0.3.1";
-      this._prefix = "MP_DialogueManager";
+      this.version = "0.3.2";
+      this.pluginName = "MP_DialogueManager";
       this._characterData = {}; // 游戏角色数据
       this._imageIdOffset = 77; // 图片 ID 偏移量 防止和其他图片冲突
       this._imageCursor = this._imageIdOffset; // 图片 ID 只能在 1 - 100 以内
@@ -103,6 +103,7 @@
             characterIndex: actor.characterIndex, // 行走图序号
             traits: {}, // 特性 (暂未使用)
             note: actor.note, // 备注
+            meta: actor.meta, // 自动解析后的备注
             images: {}, // 立绘
           };
         }
@@ -115,21 +116,26 @@
       this.log("插件初始化成功 读取到角色数据", this._characterData);
     }
 
-    getCharacterData(actor) {
-      if (typeof actor === "string") {
-        actor = Object.entries(this._characterData)
-          .filter((actorData, _) => actorData[1].name === actor)
-          .pop()[1];
-      } else if (typeof actor === "number") {
-        actor = Object.entries(this._characterData)
-          .filter((actorData, _) => actorData[1].id === actor)
-          .pop()[1];
+    getCharacterData(actorMark) {
+      let targetActor = undefined;
+      if (typeof actorMark === "string") {
+        Object.values(this._characterData)
+          .filter((actorData) => actorData.name === actorMark)
+          .map((actor) => {
+            targetActor = actor;
+          });
+      } else if (typeof actorMark === "number") {
+        Object.values(this._characterData)
+          .filter((actorData) => actorData.id === actorMark)
+          .map((actor) => {
+            targetActor = actor;
+          });
       } else {
         throw new TypeError(
-          `${thisPluginInstance._prefix}: 指定的角色参数 (${actor}) 类型错误 需要角色 ID 或角色名`
+          `${thisPluginInstance._prefix}: 指定的角色参数 (${actorMark}) 类型错误 需要角色 ID 或角色名`
         );
       }
-      return actor;
+      return targetActor;
     }
 
     showCharacterPortrait(characterData, portraitSuffix = "") {
@@ -168,13 +174,16 @@
       );
 
       // 显示立绘
-      this.showCharacterPortrait(currentActor, args[0]);
+      this.clearCharacterPortrait(); // 清除之前的立绘
+      this.showCharacterPortrait(currentActor, args[0]); // 显示当前的立绘
 
       // 显示台词
       const inputText = args.length <= 1 ? ["我是 %%%。"] : [...args.slice(1)];
       const speakerName = `\\C[6]${currentActor.name}\\C[0]`;
       const parsedText = inputText.join(" ").replace(/%%%/g, speakerName);
       $gameMessage.add(`\\}「${speakerName}」\\{\n${parsedText}`);
+      // TODO 跟在事件执行 显示文字 的表现不一致
+      // 无法和 显示选项 结合
 
       return true;
     }
@@ -183,10 +192,11 @@
   const thisPluginParameters = PluginManager.parameters("MP_DialogueManager"); // 加载本插件预设好的参数
   const thisPluginInstance = new DialogueManager(thisPluginParameters); // 实例化本插件定义好的功能类
 
-  const oldPluginCommand = Game_Interpreter.prototype.pluginCommand; // 临时保存之前的插件指令
+  const old_Game_Interpreter_PluginCommand =
+    Game_Interpreter.prototype.pluginCommand; // 临时保存之前的插件指令
   // 重载插件指令
   Game_Interpreter.prototype.pluginCommand = function (command, args) {
-    oldPluginCommand.call(this, command, args); // 继承之前的插件指令
+    old_Game_Interpreter_PluginCommand.call(this, command, args); // 继承之前的插件指令
     // 创建新的插件指令
     if (command === "MP_Dialogue") {
       if (!args || args.length < 1)
