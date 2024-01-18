@@ -33,7 +33,7 @@
     if (!window.MiyoiPlugins) {
       throw new Error(
         [
-          "MiP_Addon_PartyController 插件:",
+          "MiP_Addon_DialogueManager 插件:",
           "必需的核心依赖库缺失",
           "请先启用核心依赖插件 MiP_Core_Library",
           "(或者关闭 / 卸载本插件)",
@@ -85,11 +85,11 @@
               .join("_"),
             origin: parametersArray[0],
             x:
-              parametersArray[1] > 1
+              parametersArray[1] >= 1
                 ? parametersArray[1]
                 : parseInt(parametersArray[1] * Graphics.width),
             y:
-              parametersArray[2] > 1
+              parametersArray[2] >= 1
                 ? parametersArray[2]
                 : parseInt(parametersArray[2] * Graphics.width),
             scaleX: parametersArray[3],
@@ -125,6 +125,33 @@
           return true;
         }
 
+        _getCharacterLines(actorId) {
+          const targetActor = MiyoiPlugins.Utility.getActorByAnyway(actorId);
+          const CharacterLines = {};
+          Object.entries(targetActor.actor().meta)
+            .filter(([key, _]) =>
+              key.toString().toLowerCase().startsWith("line")
+            )
+            .map(([key, line]) => {
+              if (key.toLowerCase().endsWith("_raw")) {
+                key = key.slice(0, -"_raw".length);
+                if (CharacterLines[key] && CharacterLines[key].length > 0)
+                  CharacterLines[key].push(line.replace(/\\n/g, "\n"));
+              } else {
+                CharacterLines[key] = [line.replace(/\\n/g, "\n")];
+              }
+            });
+          Object.entries(CharacterLines).map(([key, line]) => {
+            CharacterLines[key] =
+              line.length >= 2
+                ? `${line[0]}\n\\}\\C[8]「${line[1]}」\\C[0]\\{`
+                : line[0];
+          });
+          this.debug(targetActor.name(), "的默认台词", CharacterLines);
+          const onlyLines = Object.values(CharacterLines);
+          return onlyLines[Math.floor(Math.random() * onlyLines.length)];
+        }
+
         showDialogue(eventId, ...args) {
           const currentActor =
             MiyoiPlugins.Utility.getRelatedActorByEventId(eventId);
@@ -134,14 +161,14 @@
           this.showCharacterPortrait(currentActor, args[0]); // 显示当前的立绘
 
           // 显示台词
+          const defaultLine = this._getCharacterLines(currentActor.actorId());
           const inputText =
-            args.length <= 1
-              ? [currentActor.actor().meta.line1]
-              : [...args.slice(1)];
+            args.length <= 1 ? [defaultLine] : [...args.slice(1)];
           const speakerName = `\\C[${
             currentActor.actor().meta.textColor
           }]${currentActor.name()}\\C[0]`;
           const parsedText = inputText.join(" ").replace(/%%%/g, speakerName);
+          // TODO 替换为指定预设台词 .replace(/%(line.*)%/g, "");
           $gameMessage.add(`\\}「${speakerName}」\\{\n${parsedText}`);
           // TODO 跟在事件执行 显示文字 的表现不一致
           // 无法和 显示选项 结合

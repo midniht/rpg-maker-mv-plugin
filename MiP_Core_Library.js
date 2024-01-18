@@ -158,6 +158,26 @@ MiyoiPlugins.Utility = class {
   }
 
   /**
+   * @function getActorByAnyway
+   * @description 通过角色特征检索角色对象
+   * @param {number|string} actorMark
+   * @returns {object} 找到的角色对象
+   */
+  static getActorByAnyway(actorMark) {
+    let targetActor = undefined;
+    if (typeof actorMark === "number") {
+      targetActor = MiyoiPlugins.Utility.getActorById(actorMark);
+    } else if (typeof actorMark === "string") {
+      targetActor = MiyoiPlugins.Utility.getActorByName(actorMark);
+    } else {
+      throw new TypeError(
+        `指定的角色参数 (${actorMark}) 类型错误 需要角色 ID 或角色名称`
+      );
+    }
+    return targetActor;
+  }
+
+  /**
    * @function getRelatedActorIdByEventId
    * @description 通过事件 ID 反向检索相关（被出现条件标记）的角色 ID
    * @param {number} eventId

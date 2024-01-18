@@ -67,7 +67,7 @@ MiP_Party leaveParty    # 令当前事件反向检索到的角色离开队伍
 
 ```
 MiP_Dialogue say [立绘差分] [自定义对话文本]    # 显示带立绘的角色对白
-MiP_Dialogue clearImages                        # 清除当前存在的所有立绘
+MiP_Dialogue clearImages                    # 清除当前存在的所有立绘
 ```
 
 ### Miyoi's Plugin - Prison Manager
@@ -86,7 +86,7 @@ MiP_Prison showCharacter                   # 当前地图是监牢场景，处�
 MiP_Prison showPrisoner                    # 当前地图不是监牢场景，处理是否显示角色
 MiP_Prison arrestCharacter                 # 将当前事件反向检索到的角色逮捕
 MiP_Prison releaseCharacter                # 将当前事件反向检索到的角色释放
-MiP_Prison lockdownCharacter [禁闭室编号]  # 将当前事件反向检索到的角色关禁闭 (1, 2, 3)
+MiP_Prison lockdownCharacter [禁闭室编号]    # 将当前事件反向检索到的角色关禁闭 (1, 2, 3)
 MiP_Prison punishCharacter                 # TODO
 ```
 

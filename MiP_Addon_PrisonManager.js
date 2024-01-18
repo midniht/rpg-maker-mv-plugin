@@ -95,7 +95,7 @@
     if (!window.MiyoiPlugins) {
       throw new Error(
         [
-          "MiP_Addon_PartyController 插件:",
+          "MiP_Addon_PrisonManager 插件:",
           "必需的核心依赖库缺失",
           "请先启用核心依赖插件 MiP_Core_Library",
           "(或者关闭 / 卸载本插件)",
@@ -278,7 +278,7 @@
             true
           ); // 打开 禁闭室事件 的独立开关让 禁闭室 那个事件页的检测器生效
 
-          // 更新 禁闭室事件 的 角色事件页 的图像(行走图)
+          // TODO 更新 禁闭室事件 的 角色事件页 的图像(行走图)
           // const characterEventPage = 1;
           // lockdownCellEvent.event().pages[characterEventPage].image.characterName =
           //   targetActor.characterName();
