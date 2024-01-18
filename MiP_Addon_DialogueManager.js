@@ -167,11 +167,14 @@
           const speakerName = `\\C[${
             currentActor.actor().meta.textColor
           }]${currentActor.name()}\\C[0]`;
-          const parsedText = inputText.join(" ").replace(/%%%/g, speakerName);
-          // TODO 替换为指定预设台词 .replace(/%(line.*)%/g, "");
+          const parsedText = inputText
+            .join(" ")
+            .replace(new RegExp(currentActor.name(), "g"), speakerName)
+            .replace(/%%%/g, speakerName);
+          // TODO 将关键词替换为指定预设台词 .replace(/%(line.*)%/g, "");
           $gameMessage.add(`\\}「${speakerName}」\\{\n${parsedText}`);
           // TODO 跟在事件执行 显示文字 的表现不一致
-          // 无法和 显示选项 结合
+          // 无法和事件里的 显示选项 直接结合
 
           return true;
         }

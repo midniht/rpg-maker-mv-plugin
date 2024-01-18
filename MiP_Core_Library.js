@@ -438,24 +438,31 @@ MiyoiPlugins.AddonBase = class {
   Scene_Map.prototype.onMapLoaded = function () {
     old_Scene_Map_onMapLoaded.call(this);
 
-    // 修改事件图像
+    // 修改角色事件图像
     thisPluginInstance.log(
-      `hook ${$gameMap.displayName()} onMapLoaded()`,
+      `加载场景地图 ${$gameMap.displayName()} onMapLoaded()`,
       $gameMap
         .events()
         .filter(
           (event) =>
             event.event().meta.plugin === $.config["plugin_meta_note_tag"] &&
-            event.event().meta.event === $.config["character_event_note_tag"]
+            event.event().meta.event === $.config["character_event_note_tag"] &&
+            $gameSelfSwitches.value(
+              `${event._mapId},${event.eventId()},${
+                $.config["character_event_self_switch"]
+              }`
+            )
         )
-        .map((event) =>
-          MiyoiPlugins.Utility.getRelatedActorByEventId(
+        .map((event) => {
+          const actor = MiyoiPlugins.Utility.getRelatedActorByEventId(
             event.eventId()
-          ).characterName()
-        )
+          );
+          $gameMap
+            .event(event.eventId())
+            .setImage(actor.characterName(), actor.characterIndex());
+          return [actor.name(), actor.characterName(), actor.characterIndex()];
+        })
     );
-
-    // $gameMap.event(eventId).setImage("图片文件名", 图像索引);
   };
 })(MiyoiPlugins._data || (MiyoiPlugins._data = {}));
 
