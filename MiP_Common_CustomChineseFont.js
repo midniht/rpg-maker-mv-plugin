@@ -1,5 +1,5 @@
 //=============================================================================
-// MP_CustomChineseFont.js
+// MiP_Common_CustomChineseFont.js
 //=============================================================================
 
 /*:
@@ -8,17 +8,18 @@
  *
  * @author 深宵(Miyoi)
  *
- * @help
+ * @help 自定义中文字体
+ *
  * 用以修复
  * 「即便在 gamefont.css 中正确配置好中文字体，但实际上也不会生效」
  * 的问题。
  *
  * 需要提前将字体文件放置在位于根目录的 /fonts/ 路径下，
- * 并在右边的参数中提供准确的字体文件名。
+ * 并在右边的参数栏中提供准确的字体文件名。
  *
  * 配置好后，直接启动游戏即可确认效果。
- * （标题界面的字体仍为默认字体是正常的，不是 bug）
- * （因为标题界面的显示时机在本插件生效之前）
+ * （标题界面的字体仍为默认字体是正常的，不是 bug。）
+ * （因为标题界面的显示时机在本插件生效之前。）
  *
  * @param 指定字体文件
  * @desc 准确的字体文件名，形如 font.ttf
@@ -30,8 +31,8 @@
 (function () {
   // 获取插件参数指定的字体文件名
   const CustomGameFontFile = PluginManager.parameters(
-    "MP_CustomChineseFont"
-  ).指定字体文件;
+    "MiP_Common_CustomChineseFont"
+  )["指定字体文件"];
 
   // 如果设置了该参数
   if (CustomGameFontFile) {
@@ -47,5 +48,9 @@
     Window_Base.prototype.standardFontFace = function () {
       return "CustomGameFont, SimHei, Heiti TC, sans-serif";
     };
+
+    console.debug(
+      `MiP_Common_CustomChineseFont [自定义中文字体] 新的字体 ${CustomGameFontFile} 已应用`
+    );
   }
 })();

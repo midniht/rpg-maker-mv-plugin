@@ -1,9 +1,11 @@
 //=============================================================================
-// MP_BrandNewPluginTemplate.js
+// MiP_Common_BrandNewPluginTemplate.js
 //=============================================================================
 
 /*:
  * @plugindesc 对插件的描述
+ * v0.1.0
+ *
  * @author 插件作者的名字
  *
  * @help 插件的帮助信息 - 应该如何使用该插件
@@ -150,25 +152,25 @@
  *
  * @param 一个可编辑选项的参数
  * @parent RM 官方实现的数据结构
+ * @desc 这是一个可编辑选项的参数。
  * @type combo
  * @option Arfthur
  * @option Barkley
  * @option Charles
- * @desc 这是一个可编辑选项的参数。
  * @default Arfthur
  *
  * @param 一个数组参数
  * @parent RM 官方实现的数据结构
+ * @desc 这是一个特定类型的数组。
  * @type number[]
  * @min 1
  * @max 255
- * @desc 这是一个特定类型的数组。
  * @default []
  *
  * @param 一个对象参数
  * @parent RM 官方实现的数据结构
- * @type struct<objectName>
  * @desc 这是一个对象参数。
+ * @type struct<objectName>
  */
 
 /*~struct~objectName:
@@ -243,7 +245,9 @@ class BrandNewPluginDemo {
  * @description 内部代码运行在局部的作用域 防止本插件内部的变量污染到全局
  */
 (function () {
-  const thisPluginParameters = PluginManager.parameters("BrandNewPluginDemo"); // 加载本插件预设好的参数
+  const thisPluginParameters = PluginManager.parameters(
+    "MiP_Common_BrandNewPluginTemplate"
+  ); // 加载本插件预设好的参数
   const thisPluginInstance = new BrandNewPluginDemo(thisPluginParameters); // 实例化本插件定义好的功能类
   thisPluginInstance.test(); // 测试实例
 
