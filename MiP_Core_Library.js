@@ -129,7 +129,7 @@ MiyoiPlugins.Utility = class {
    * @function getActorById
    * @description 通过角色 ID 检索角色对象
    * @param {number} actorId
-   * @returns {object} 找到的角色对象
+   * @returns {any} 找到的角色对象
    */
   static getActorById(actorId) {
     const targetActor = $gameActors.actor(actorId);
@@ -144,7 +144,7 @@ MiyoiPlugins.Utility = class {
    * @function getActorByName
    * @description 通过角色名称检索角色对象
    * @param {string} actorName
-   * @returns {object} 找到的角色对象
+   * @returns {any} 找到的角色对象
    */
   static getActorByName(actorName) {
     const targetActor = $dataActors
@@ -161,7 +161,7 @@ MiyoiPlugins.Utility = class {
    * @function getActorByAnyway
    * @description 通过角色特征检索角色对象
    * @param {number|string} actorMark
-   * @returns {object} 找到的角色对象
+   * @returns {any} 找到的角色对象
    */
   static getActorByAnyway(actorMark) {
     let targetActor = undefined;
@@ -184,8 +184,12 @@ MiyoiPlugins.Utility = class {
    * @returns {number} 相关的角色 ID
    */
   static getRelatedActorIdByEventId(eventId) {
-    return $gameMap
-      .event(eventId)
+    const event = $gameMap.event(eventId);
+    if (!event)
+      throw new RangeError(
+        `当前地图 ${$gameMap.displayName()}(${$gameMap.mapId()}) 没有找到事件 ${eventId}`
+      );
+    return event
       .event()
       .pages.filter((page) => page.conditions.actorValid)
       .map((page) => page.conditions.actorId)
@@ -196,19 +200,18 @@ MiyoiPlugins.Utility = class {
    * @function getRelatedActorByEventId
    * @description 通过事件 ID 反向检索相关（被出现条件标记）的角色对象
    * @param {number} eventId
-   * @returns {object} 相关的角色对象
+   * @returns {object|undefined} 相关的角色对象
    */
   static getRelatedActorByEventId(eventId) {
-    return MiyoiPlugins.Utility.getActorById(
-      MiyoiPlugins.Utility.getRelatedActorIdByEventId(eventId)
-    );
+    const actorId = MiyoiPlugins.Utility.getRelatedActorIdByEventId(eventId);
+    return actorId ? MiyoiPlugins.Utility.getActorById(actorId) : undefined;
   }
 
   /**
    * @function getEventById
    * @description 通过事件 ID 检索事件对象
    * @param {number} eventId
-   * @returns {object} 找到的事件对象
+   * @returns {any} 找到的事件对象
    */
   static getEventById(eventId) {
     return $gameMap.event(eventId);
@@ -217,7 +220,7 @@ MiyoiPlugins.Utility = class {
   /**
    * @function getPluginEvents
    * @description 通过备注(note)解析到 meta 属性里的标记 检索本插件专属的事件
-   * @returns {object[]} 标记了 交给本插件管理 的事件数组
+   * @returns {any[]} 标记了 交给本插件管理 的事件数组
    */
   static getPluginEvents() {
     return $gameMap
@@ -227,6 +230,173 @@ MiyoiPlugins.Utility = class {
           event.event().meta.plugin ===
           MiyoiPlugins.getConfig("plugin_meta_note_tag")
       );
+  }
+
+  /**
+   * @function getCurrentMapSelfSwitches
+   * @description 获取当前地图的独立开关数据
+   * @returns {any[]} 本地图的独立开关相关数据
+   */
+  static getCurrentMapSelfSwitches() {
+    return Object.entries($gameSelfSwitches._data)
+      .filter(
+        ([keyString, _]) => Number(keyString.split(",")[0]) === $gameMap.mapId()
+      ) // 防止过图(切换地图)时报错
+      .map(([keyString, selfSwitchStatus]) => {
+        const token = keyString.split(",");
+        const mapId = Number(token[0]);
+        const eventId = Number(token[1]);
+        const actor = MiyoiPlugins.Utility.getRelatedActorByEventId(eventId);
+        return {
+          selfSwitchChoice: token[2],
+          selfSwitchStatus: selfSwitchStatus,
+          actorId: actor ? actor.actorId() : -1,
+          actorName: actor ? actor.name() : "该事件未指定角色",
+          eventId: eventId,
+          eventName: MiyoiPlugins.Utility.getEventById(eventId).event().name,
+          mapId: mapId,
+          mapName: $gameMap.displayName(),
+        };
+      });
+  }
+
+  /**
+   * @function getActorCharacterFromDataMap
+   * @description 通过 静态地图数据 获取当前的 (由本插件管理的)事件的图像(行走图)设置
+   * @returns {any[]} 由插件管理的事件的图像设置列表
+   */
+  static getActorCharacterFromDataMap(dataObject = $dataMap) {
+    return dataObject.events
+      .filter(
+        (eventData) =>
+          eventData &&
+          eventData.meta.plugin ===
+            MiyoiPlugins.getConfig("plugin_meta_note_tag") &&
+          eventData.meta.event ===
+            MiyoiPlugins.getConfig("character_event_note_tag")
+      )
+      .map((eventData) => {
+        const event = MiyoiPlugins.Utility.getEventById(eventData.id);
+        return {
+          id: eventData.id,
+          name: eventData.name,
+          actorName: event
+            ? MiyoiPlugins.Utility.getRelatedActorByEventId(
+                event.eventId()
+              ).name()
+            : undefined,
+          pagesImage: eventData.pages
+            .map((page) => {
+              const pageImageData = {
+                characterName: page.image.characterName,
+                characterIndex: page.image.characterIndex,
+                pattern: page.image.pattern,
+              };
+              return pageImageData;
+            })
+            .map(
+              (image) =>
+                `${image.characterName || "none"}[${image.characterIndex}](${
+                  image.pattern
+                })`
+            )
+            .join(", "),
+        };
+      });
+  }
+
+  /**
+   * @function getActiveEventPageIndexBySelfSwitchChoice
+   * @description 通过指定的独立开关检索事件页序号
+   * @param {number} eventId
+   * @param {string} selfSwitchChoice
+   * @returns {number} 事件页序号
+   */
+  static getActiveEventPageIndexBySelfSwitchChoice(eventId, selfSwitchChoice) {
+    let pageIndex = -1;
+    const eventData = MiyoiPlugins.Utility.getEventById(eventId).event();
+    eventData.pages.map((page, index) => {
+      if (
+        page.conditions.selfSwitchValid && // 已经启用独立开关
+        page.conditions.selfSwitchCh === selfSwitchChoice
+      )
+        pageIndex = index; // 如果同时有多个事件页满足条件 最终结果一定是最后一个 符合事件页的优先级逻辑
+    });
+    if (pageIndex < 0) {
+      console.warn(
+        "in getActiveEventPageIndexBySelfSwitchChoice()",
+        "事件备注",
+        eventData.meta,
+        "出现条件",
+        eventData.pages.map((page) => page.conditions)
+      );
+      throw new RangeError(
+        `通过地图 ${$gameMap.displayName()} (ID:${$gameMap.mapId()})` +
+          `的事件 ${eventData.name} (ID:${eventId})` +
+          `的独立开关 ${selfSwitchChoice}<br>检索对应的事件页失败`
+      );
+    }
+    return pageIndex;
+  }
+  /**
+   * @function setCharacterEvent
+   * @description 将指定 事件 的指定 事件页 的图像设置为指定角色
+   * @param {number} actorId
+   * @param {number} eventId
+   * @param {boolean} usePage
+   * @param {number} pageIndex
+   * @returns {any} 修改后的事件页数据
+   */
+  static setCharacterEvent(actorId, eventId, usePage = false, pageIndex = -1) {
+    const targetActor = MiyoiPlugins.Utility.getActorById(actorId);
+    const characterEvent = MiyoiPlugins.Utility.getEventById(eventId);
+    pageIndex =
+      pageIndex >= 0 ? pageIndex : characterEvent.findProperPageIndex();
+    if (usePage) {
+      characterEvent.event().pages[pageIndex].image.characterName =
+        targetActor.characterName();
+      characterEvent.event().pages[pageIndex].image.characterIndex =
+        targetActor.characterIndex();
+      characterEvent.event().pages[pageIndex].image.pattern = 1; // 默认第二帧
+    } else {
+      characterEvent.setImage(
+        targetActor.characterName(),
+        targetActor.characterIndex()
+      ); // 让角色事件更新图像
+      // characterEvent.refresh(); // 貌似没起作用
+    }
+    return characterEvent.event().pages[pageIndex];
+  }
+
+  /**
+   * @function setChosenCharacterEvents
+   * @description 将当前地图场景下所有 角色事件 的图像设置为对应的角色
+   * @param {any[]} eventList
+   * @param {string} eventSelfSwitchChoice
+   * @returns {any[]} 新事件的图像相关数据
+   */
+  static setChosenCharacterEvents(eventList, eventSelfSwitchChoice) {
+    return eventList.map((event) => {
+      const actor = MiyoiPlugins.Utility.getRelatedActorByEventId(
+        event.eventId()
+      );
+      MiyoiPlugins.Utility.setCharacterEvent(
+        actor.actorId(),
+        event.eventId(),
+        true,
+        MiyoiPlugins.Utility.getActiveEventPageIndexBySelfSwitchChoice(
+          event.eventId(),
+          eventSelfSwitchChoice
+        )
+      );
+      return {
+        eventId: event.eventId(),
+        actorId: actor.actorId(),
+        actorName: actor.name(),
+        characterName: actor.characterName(),
+        characterIndex: actor.characterIndex(),
+      };
+    });
   }
 };
 
@@ -377,6 +547,19 @@ MiyoiPlugins.AddonBase = class {
 };
 
 /**
+ * @function getConfig
+ * @description 获取核心依赖(即本插件)的配置项
+ * @param {string} configName
+ * @returns {any} 对应的配置项内容
+ */
+MiyoiPlugins.getConfig = function (configName) {
+  if (configName in this._data.config) {
+    return this._data.config[configName];
+  }
+  return null;
+};
+
+/**
  * @function 自动执行的业务逻辑放进匿名闭包
  * @description 内部代码运行在局部的作用域 防止内部变量污染到全局
  */
@@ -394,8 +577,8 @@ MiyoiPlugins.AddonBase = class {
       globalPluginParameters["Leave Party Skill"] ||
         globalPluginParameters["「离开队伍」技能"]
     ),
-    character_event_self_switch:
-      globalPluginParameters["Character Event Self Switch"] ||
+    character_event_self_switch_choice:
+      globalPluginParameters["Character Event Self Switch Choice"] ||
       globalPluginParameters["显示角色的独立开关"],
     character_event_note_tag:
       globalPluginParameters["Character Event Note Tag"] ||
@@ -408,70 +591,56 @@ MiyoiPlugins.AddonBase = class {
     return thisPluginInstance.test("a", 1, "b", 2, "c", 3);
   };
 
-  const old_Game_Interpreter_PluginCommand =
-    Game_Interpreter.prototype.pluginCommand; // 临时保存之前的插件指令
-  // 重载插件指令
-  Game_Interpreter.prototype.pluginCommand = function (command, args) {
-    old_Game_Interpreter_PluginCommand.call(this, command, args); // 继承之前的插件指令
-    // 创建新的插件指令
-    if (command === "MiP_Party") {
-      if (!args || args.length < 1)
-        throw new RangeError(
-          `${thisPluginInstance.addonName}: 插件命令的参数数量错误 ${args}`
-        );
-      switch (args[0]) {
-        case "joinParty":
-          thisPluginInstance.joinParty(this.eventId());
-          break;
-        case "leaveParty":
-          thisPluginInstance.leaveParty();
-          break;
-        default:
-          thisPluginInstance.error("未定义的插件指令", args);
-          break;
-      }
-    }
-  };
-
   const old_Scene_Map_onMapLoaded = Scene_Map.prototype.onMapLoaded; // 临时保存之前的地图加载函数
   // 重载地图加载函数
   Scene_Map.prototype.onMapLoaded = function () {
     old_Scene_Map_onMapLoaded.call(this);
-
-    // 修改角色事件图像
-    thisPluginInstance.log(
-      `加载场景地图 ${$gameMap.displayName()} onMapLoaded()`,
+    const newCharacterImages = MiyoiPlugins.Utility.setChosenCharacterEvents(
       $gameMap
         .events()
         .filter(
           (event) =>
             event.event().meta.plugin === $.config["plugin_meta_note_tag"] &&
-            event.event().meta.event === $.config["character_event_note_tag"] &&
-            $gameSelfSwitches.value(
-              `${event._mapId},${event.eventId()},${
-                $.config["character_event_self_switch"]
-              }`
-            )
-        )
-        .map((event) => {
-          const actor = MiyoiPlugins.Utility.getRelatedActorByEventId(
-            event.eventId()
-          );
-          $gameMap
-            .event(event.eventId())
-            .setImage(actor.characterName(), actor.characterIndex());
-          return [actor.name(), actor.characterName(), actor.characterIndex()];
-        })
+            event.event().meta.event === $.config["character_event_note_tag"]
+        ),
+      MiyoiPlugins.getConfig("character_event_self_switch_choice")
+    ); // 刷新一般角色事件的图像
+    thisPluginInstance.debug(
+      `场景地图已加载 onMapLoaded() ${$gameMap.displayName()} 已刷新角色事件图像:`,
+      newCharacterImages /* .map(
+        (data) =>
+          `当前地图的 事件${data.eventId}(${data.actorId}:${data.actorName}) ` +
+          `的图像已更新为 ${data.characterName}[${data.characterIndex}]`
+      ) // */
+      // MiyoiPlugins.Utility.getActorCharacterFromDataMap()
     );
+
+    const old_Game_Interpreter_PluginCommand =
+      Game_Interpreter.prototype.pluginCommand; // 临时保存之前的插件指令
+    // 重载插件指令
+    Game_Interpreter.prototype.pluginCommand = function (command, args) {
+      old_Game_Interpreter_PluginCommand.call(this, command, args); // 继承之前的插件指令
+      // 创建新的插件指令
+      if (command === "MiP_Party") {
+        if (!args || args.length < 1)
+          throw new RangeError(
+            `${thisPluginInstance.addonName}: 插件命令的参数数量错误 ${args}`
+          );
+        switch (args[0]) {
+          case "joinParty":
+            thisPluginInstance.joinParty(this.eventId());
+            break;
+          case "leaveParty":
+            thisPluginInstance.leaveParty();
+            break;
+          default:
+            thisPluginInstance.error("未定义的插件指令", args);
+            break;
+        }
+      }
+    };
   };
 })(MiyoiPlugins._data || (MiyoiPlugins._data = {}));
-
-MiyoiPlugins.getConfig = function (configName) {
-  if (configName in this._data.config) {
-    return this._data.config[configName];
-  }
-  return null;
-};
 
 // console.log(
 //   "MiP_Core_Library 插件核心依赖库初始化",

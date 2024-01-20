@@ -92,7 +92,7 @@
   // 重载场景启动事件函数
   SceneManager.onSceneStart = function () {
     old_SceneManager_onSceneStart.call(this);
-    if (!window.MiyoiPlugins) {
+    if (!MiyoiPlugins) {
       throw new Error(
         [
           "MiP_Addon_PrisonManager 插件:",
@@ -120,13 +120,13 @@
           this._config["imprison_state"] = Number(
             config["Imprison State"] || config["「监禁中」状态"]
           );
-          this._config["prisoner_event_self_switch"] =
-            config["Prisoner Event Self Switch"] ||
+          this._config["prisoner_event_self_switch_choice"] =
+            config["Prisoner Event Self Switch Choice"] ||
             config["显示「监禁中」角色的独立开关"];
           this._config["prisoner_event_note_tag"] =
             config["Prisoner Event Note Tag"] || config["监牢角色事件备注标记"];
-          this._config["lockdown_event_self_switch"] =
-            config["Lockdown Event Self Switch"] ||
+          this._config["lockdown_event_self_switch_choice"] =
+            config["Lockdown Event Self Switch Choice"] ||
             config["显示「禁闭中」角色的独立开关"];
           this._config["lockdown_event_note_tag"] =
             config["Lockdown Event Note Tag"] || config["禁闭室事件备注标记"];
@@ -158,35 +158,13 @@
          */
         handleShowCharacter(mapId, eventId, atPrison = false) {
           if (this._canShowCharacter(eventId, atPrison)) {
+            const effectiveSelfSwitchChoice = atPrison
+              ? this._config["prisoner_event_self_switch_choice"]
+              : MiyoiPlugins.getConfig("character_event_self_switch_choice");
             $gameSelfSwitches.setValue(
-              [
-                mapId,
-                eventId,
-                atPrison
-                  ? this._config["prisoner_event_self_switch"]
-                  : MiyoiPlugins.getConfig("character_event_self_switch"),
-              ],
+              [mapId, eventId, effectiveSelfSwitchChoice],
               true
             ); // 打开当前事件的独立开关让下一页生效
-
-            // 使用代码自动修改 事件页 绑定的图像(行走图)
-            const targetActorEvent = MiyoiPlugins.Utility.getEventById(eventId);
-            const targetActor =
-              MiyoiPlugins.Utility.getRelatedActorByEventId(eventId);
-            this.debug(
-              "当前角色应该显示",
-              targetActor.name()
-              // $dataActors[targetActor.actorId()].meta
-            );
-            const characterEventPage = 1;
-            targetActorEvent.event().pages[
-              characterEventPage
-            ].image.characterName = targetActor.characterName();
-            targetActorEvent.event().pages[
-              characterEventPage
-            ].image.pattern = 1; // 默认第二帧
-            targetActorEvent.refresh();
-
             return true;
           } else {
             $gameMap.eraseEvent(eventId); // 暂时消除事件 防止自动执行的事件陷入死循环
@@ -202,13 +180,13 @@
             [
               mapId,
               eventId,
-              MiyoiPlugins.getConfig("character_event_self_switch"),
+              MiyoiPlugins.getConfig("character_event_self_switch_choice"),
             ],
             false
           ); // 关闭当前事件的独立开关让第一页的检测器生效
           this.debug(
             `抓获角色 关闭地图 ${mapId} 的事件 ${eventId} 的独立开关`,
-            MiyoiPlugins.getConfig("character_event_self_switch")
+            MiyoiPlugins.getConfig("character_event_self_switch_choice")
           );
           return true;
         }
@@ -218,12 +196,12 @@
             this._config["imprison_state"]
           ); // 解除监禁状态
           $gameSelfSwitches.setValue(
-            [mapId, eventId, this._config["prisoner_event_self_switch"]],
+            [mapId, eventId, this._config["prisoner_event_self_switch_choice"]],
             false
           ); // 关闭当前事件的独立开关让第一页的检测器生效
           this.debug(
             `释放角色 关闭地图 ${mapId} 的事件 ${eventId} 的独立开关`,
-            this._config["prisoner_event_self_switch"]
+            this._config["prisoner_event_self_switch_choice"]
           );
           return true;
         }
@@ -235,12 +213,13 @@
               [
                 this._lockdownCells[cellId].mapIdOfActorEvent,
                 this._lockdownCells[cellId].eventIdOfActorEvent,
-                this._config["lockdown_event_self_switch"],
+                this._config["lockdown_event_self_switch_choice"],
               ],
               false
-            );
+            ); // 关闭 禁闭室事件 的独立开关让当前 禁闭室 的事件页的检测器失效
             this._lockdownCells[cellId] = undefined;
           }
+
           // 更新新人
           const targetActor =
             MiyoiPlugins.Utility.getRelatedActorByEventId(eventId);
@@ -254,10 +233,10 @@
             [
               this._lockdownCells[cellId].mapIdOfActorEvent,
               this._lockdownCells[cellId].eventIdOfActorEvent,
-              this._config["lockdown_event_self_switch"],
+              this._config["lockdown_event_self_switch_choice"],
             ],
             true
-          ); // 打开 角色事件 的独立开关让 禁闭室 那个事件页的检测器生效
+          ); // 打开 角色事件 的独立开关让 禁闭室 那个事件页的检测器生效 即禁用囚犯原来的事件
 
           const lockdownCellEvent = $gameMap
             .events()
@@ -265,7 +244,7 @@
               (event) =>
                 event.event().meta.event ===
                   this._config["lockdown_event_note_tag"] &&
-                event.event().meta.id === cellId
+                event.event().meta.cid === cellId
             )
             .pop();
           this.debug(`成功匹配到禁闭室 ${cellId} 事件`, lockdownCellEvent);
@@ -273,26 +252,25 @@
             [
               lockdownCellEvent._mapId,
               lockdownCellEvent.eventId(),
-              this._config["lockdown_event_self_switch"],
+              this._config["lockdown_event_self_switch_choice"],
             ],
             true
           ); // 打开 禁闭室事件 的独立开关让 禁闭室 那个事件页的检测器生效
+          MiyoiPlugins.Utility.setCharacterEvent(
+            targetActor.actorId(),
+            lockdownCellEvent.eventId()
+            // true,
+            // MiyoiPlugins.Utility.getActiveEventPageIndexBySelfSwitchChoice(
+            //   lockdownCellEvent.eventId(),
+            //   this._config["lockdown_event_self_switch_choice"]
+            // )
+          ); // 让禁闭室事件更新为当前被关禁闭的角色图像
 
-          // TODO 更新 禁闭室事件 的 角色事件页 的图像(行走图)
-          // const characterEventPage = 1;
-          // lockdownCellEvent.event().pages[characterEventPage].image.characterName =
-          //   targetActor.characterName();
-          // lockdownCellEvent.event().pages[characterEventPage].image.pattern = 1; // 默认第二帧
-          this.log("刷新事件之前", lockdownCellEvent._pageIndex);
-          lockdownCellEvent.refresh();
-          this.log("刷新事件之后", lockdownCellEvent._pageIndex);
-          lockdownCellEvent.setImage(targetActor.characterName(), 0);
-
-          return false;
+          return true;
         }
 
         punishCharacter() {
-          this.debug(
+          this.log(
             "禁闭室当前状态",
             Object.values(this._lockdownCells).map((cell) => cell)
           );
@@ -305,6 +283,40 @@
       ); // 加载本插件预设好的参数
       const thisPluginInstance = new PrisonManager(thisPluginParameters); // 实例化本插件定义好的功能类
       $.prisonManager = thisPluginInstance; // 挂载到全局窗口
+
+      const old_Scene_Map_onMapLoaded = Scene_Map.prototype.onMapLoaded; // 临时保存之前的地图加载函数
+      // 重载地图加载函数
+      Scene_Map.prototype.onMapLoaded = function () {
+        old_Scene_Map_onMapLoaded.call(this);
+        // 刷新监禁中角色事件图像
+
+        const newPrisonerImages = MiyoiPlugins.Utility.setChosenCharacterEvents(
+          $gameMap
+            .events()
+            .filter(
+              (event) =>
+                event.event().meta.plugin ===
+                  MiyoiPlugins.getConfig("plugin_meta_note_tag") &&
+                event.event().meta.event ===
+                  thisPluginInstance._config["prisoner_event_note_tag"]
+            ) // 所有囚犯角色事件
+            .filter(
+              (event) =>
+                !$gameSelfSwitches.value(
+                  `${event._mapId},${event.eventId()},${
+                    thisPluginInstance._config[
+                      "lockdown_event_self_switch_choice"
+                    ]
+                  }`
+                )
+            ), // 排除禁闭室中的角色
+          thisPluginInstance._config["prisoner_event_self_switch_choice"]
+        ); // 刷新囚犯角色事件的图像
+        thisPluginInstance.debug(
+          `场景地图已加载 onMapLoaded() ${$gameMap.displayName()} 已刷新囚徒图像:`,
+          newPrisonerImages
+        );
+      };
 
       const old_Game_Interpreter_PluginCommand =
         Game_Interpreter.prototype.pluginCommand; // 临时保存之前的插件指令

@@ -30,7 +30,7 @@
   // 重载场景启动事件函数
   SceneManager.onSceneStart = function () {
     old_SceneManager_onSceneStart.call(this);
-    if (!window.MiyoiPlugins) {
+    if (!MiyoiPlugins) {
       throw new Error(
         [
           "MiP_Addon_DialogueManager 插件:",
@@ -62,8 +62,8 @@
           this._imageCacheCursor = this._imageCacheOffset; // 图片 ID 只能在 1 - 100 以内
         }
 
-        showCharacterPortrait(characterData, differentialSuffix = "") {
-          const parametersArray = Object.entries(characterData.actor().meta)
+        showCharacterPortrait(theCharacter, differentialSuffix = "") {
+          const parametersArray = Object.entries(theCharacter.actor().meta)
             .filter(([key, _]) =>
               key.toString().toLowerCase().startsWith("image")
             )
@@ -75,14 +75,24 @@
                 .map((argv) => Number(argv))
             )
             .pop();
+          const pictureFilename = [
+            this._config["portrait_prefix"],
+            theCharacter.name(),
+            differentialSuffix,
+          ]
+            .filter((str) => typeof str === "string" && str !== "")
+            .join("_");
+          if (!parametersArray) {
+            throw new ReferenceError(
+              [
+                `${this.addonName}:`,
+                `没有找到指定(${differentialSuffix})的立绘图片`,
+                `/img/pictures/${pictureFilename}.png`,
+              ].join("<br>")
+            );
+          }
           const pictureParameters = {
-            filename: [
-              this._config["portrait_prefix"],
-              characterData.name(),
-              differentialSuffix,
-            ]
-              .filter((str) => typeof str === "string" && str !== "")
-              .join("_"),
+            filename: pictureFilename,
             origin: parametersArray[0],
             x:
               parametersArray[1] >= 1
@@ -97,7 +107,7 @@
             opacity: parametersArray[5],
             blendMode: parametersArray[6],
           };
-          this.debug(characterData.name(), "的差分立绘", pictureParameters);
+          this.debug(theCharacter.name(), "的差分立绘", pictureParameters);
 
           this._imageCacheCursor += 1;
           $gameScreen.showPicture(
@@ -147,35 +157,47 @@
                 ? `${line[0]}\n\\}\\C[8]「${line[1]}」\\C[0]\\{`
                 : line[0];
           });
-          this.debug(targetActor.name(), "的默认台词", CharacterLines);
-          const onlyLines = Object.values(CharacterLines);
-          return onlyLines[Math.floor(Math.random() * onlyLines.length)];
+          return CharacterLines;
+        }
+
+        showCharacterLine(theCharacter, customLine) {
+          const lineList = this._getCharacterLines(theCharacter.actorId());
+          this.debug(theCharacter.name(), "的台本", lineList);
+          // onlyLines[Math.floor(Math.random() * onlyLines.length)];
+          const speakerName = theCharacter.actor().meta.textColor
+            ? `\\C[${
+                theCharacter.actor().meta.textColor
+              }]${theCharacter.name()}\\C[0]`
+            : theCharacter.name();
+          let parsedText =
+            customLine.length > 0 ? customLine.join(" ") : "我是%%%。";
+          const matchesKeyword = parsedText.match(/%([^%]+)%/g); // 替换台本中有的关键词简写
+          if (matchesKeyword !== null) {
+            parsedText = matchesKeyword
+              .map((matchedKeyword) => matchedKeyword.slice(1, -1))
+              .filter((keyword) => keyword in lineList)
+              .reduce(
+                (accumulator, currentKeyword) =>
+                  accumulator.replace(
+                    `%${currentKeyword}%`,
+                    lineList[currentKeyword]
+                  ),
+                parsedText
+              );
+          }
+          parsedText = parsedText
+            .replace(new RegExp(theCharacter.name(), "g"), speakerName) // 尝试高亮发言角色的名称
+            .replace(/%%%/g, speakerName); // 替换角色名称简写(即 %%%)
+          $gameMessage.add(`\\}「${speakerName}」\\{\n${parsedText}`);
+          return true;
         }
 
         showDialogue(eventId, ...args) {
           const currentActor =
             MiyoiPlugins.Utility.getRelatedActorByEventId(eventId);
-
-          // 显示立绘
           this.clearCharacterPortrait(); // 清除之前的立绘
           this.showCharacterPortrait(currentActor, args[0]); // 显示当前的立绘
-
-          // 显示台词
-          const defaultLine = this._getCharacterLines(currentActor.actorId());
-          const inputText =
-            args.length <= 1 ? [defaultLine] : [...args.slice(1)];
-          const speakerName = `\\C[${
-            currentActor.actor().meta.textColor
-          }]${currentActor.name()}\\C[0]`;
-          const parsedText = inputText
-            .join(" ")
-            .replace(new RegExp(currentActor.name(), "g"), speakerName)
-            .replace(/%%%/g, speakerName);
-          // TODO 将关键词替换为指定预设台词 .replace(/%(line.*)%/g, "");
-          $gameMessage.add(`\\}「${speakerName}」\\{\n${parsedText}`);
-          // TODO 跟在事件执行 显示文字 的表现不一致
-          // 无法和事件里的 显示选项 直接结合
-
+          this.showCharacterLine(currentActor, [...args.slice(1)]); // 显示台词
           return true;
         }
       }
@@ -200,6 +222,9 @@
           switch (args[0]) {
             case "say":
               thisPluginInstance.showDialogue(this.eventId(), ...args.slice(1));
+              this.setWaitMode("message");
+              // TODO 跟在事件执行 显示文字 的表现不一致
+              // 无法和事件里的 显示选项 直接结合
               break;
             case "clearImages":
               thisPluginInstance.clearCharacterPortrait();
