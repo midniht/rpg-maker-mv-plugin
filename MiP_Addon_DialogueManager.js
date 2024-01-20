@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Dialogue Manager
- * v0.5.0
+ * v0.7.0
  *
  * @author 深宵(Miyoi)
  *

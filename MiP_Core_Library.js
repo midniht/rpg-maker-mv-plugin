@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Core Library
- * v0.3.0
+ * v0.5.0
  *
  * @author 深宵(Miyoi)
  *

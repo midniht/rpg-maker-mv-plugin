@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Prison Manager
- * v0.7.1
+ * v0.7.3
  *
  * @author 深宵(Miyoi)
  *
