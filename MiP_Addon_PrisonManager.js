@@ -185,7 +185,9 @@
             false
           ); // 关闭当前事件的独立开关让第一页的检测器生效
           this.debug(
-            `抓获角色 关闭地图 ${mapId} 的事件 ${eventId} 的独立开关`,
+            `捕获角色 关闭当前地图场景 ${$gameMap.displayName()}(ID:${mapId}) 的事件 ${
+              MiyoiPlugins.Utility.getEventById(eventId).event().name
+            }(ID:${eventId}) 的独立开关`,
             MiyoiPlugins.getConfig("character_event_self_switch_choice")
           );
           return true;
@@ -290,26 +292,27 @@
         old_Scene_Map_onMapLoaded.call(this);
         // 刷新监禁中角色事件图像
 
+        const newPrisonerEvents = $gameMap
+          .events()
+          .filter(
+            (event) =>
+              event.event().meta.plugin ===
+                MiyoiPlugins.getConfig("plugin_meta_note_tag") &&
+              event.event().meta.event ===
+                thisPluginInstance._config["prisoner_event_note_tag"]
+          ) // 所有囚犯角色事件
+          .filter(
+            (event) =>
+              !$gameSelfSwitches.value(
+                `${event._mapId},${event.eventId()},${
+                  thisPluginInstance._config[
+                    "lockdown_event_self_switch_choice"
+                  ]
+                }`
+              )
+          ); // 排除禁闭室中的角色
         const newPrisonerImages = MiyoiPlugins.Utility.setChosenCharacterEvents(
-          $gameMap
-            .events()
-            .filter(
-              (event) =>
-                event.event().meta.plugin ===
-                  MiyoiPlugins.getConfig("plugin_meta_note_tag") &&
-                event.event().meta.event ===
-                  thisPluginInstance._config["prisoner_event_note_tag"]
-            ) // 所有囚犯角色事件
-            .filter(
-              (event) =>
-                !$gameSelfSwitches.value(
-                  `${event._mapId},${event.eventId()},${
-                    thisPluginInstance._config[
-                      "lockdown_event_self_switch_choice"
-                    ]
-                  }`
-                )
-            ), // 排除禁闭室中的角色
+          newPrisonerEvents,
           thisPluginInstance._config["prisoner_event_self_switch_choice"]
         ); // 刷新囚犯角色事件的图像
         thisPluginInstance.debug(

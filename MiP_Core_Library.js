@@ -376,10 +376,12 @@ MiyoiPlugins.Utility = class {
    * @returns {any[]} 新事件的图像相关数据
    */
   static setChosenCharacterEvents(eventList, eventSelfSwitchChoice) {
-    return eventList.map((event) => {
+    const newCharacterImages = eventList.map((event) => {
       const actor = MiyoiPlugins.Utility.getRelatedActorByEventId(
         event.eventId()
       );
+      // 通过直接修改事件 page 数据
+      // 设置 **初始化时** 所有事件的 _对应事件页_ 的图像
       MiyoiPlugins.Utility.setCharacterEvent(
         actor.actorId(),
         event.eventId(),
@@ -389,6 +391,18 @@ MiyoiPlugins.Utility = class {
           eventSelfSwitchChoice
         )
       );
+      // 通过 Game_CharacterBase.prototype.setImage() 方法
+      // 设置 **每次重载后** 已生效事件的 _当前事件页_ 的图像
+      if (
+        $gameSelfSwitches.value(
+          `${event._mapId},${event.eventId()},${eventSelfSwitchChoice}`
+        )
+      ) {
+        MiyoiPlugins.Utility.setCharacterEvent(
+          actor.actorId(),
+          event.eventId()
+        );
+      }
       return {
         eventId: event.eventId(),
         actorId: actor.actorId(),
@@ -397,6 +411,7 @@ MiyoiPlugins.Utility = class {
         characterIndex: actor.characterIndex(),
       };
     });
+    return newCharacterImages;
   }
 };
 
@@ -595,14 +610,15 @@ MiyoiPlugins.getConfig = function (configName) {
   // 重载地图加载函数
   Scene_Map.prototype.onMapLoaded = function () {
     old_Scene_Map_onMapLoaded.call(this);
+    const newCharacterEvents = $gameMap
+      .events()
+      .filter(
+        (event) =>
+          event.event().meta.plugin === $.config["plugin_meta_note_tag"] &&
+          event.event().meta.event === $.config["character_event_note_tag"]
+      );
     const newCharacterImages = MiyoiPlugins.Utility.setChosenCharacterEvents(
-      $gameMap
-        .events()
-        .filter(
-          (event) =>
-            event.event().meta.plugin === $.config["plugin_meta_note_tag"] &&
-            event.event().meta.event === $.config["character_event_note_tag"]
-        ),
+      newCharacterEvents,
       MiyoiPlugins.getConfig("character_event_self_switch_choice")
     ); // 刷新一般角色事件的图像
     thisPluginInstance.debug(

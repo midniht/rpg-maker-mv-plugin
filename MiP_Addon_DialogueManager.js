@@ -154,7 +154,7 @@
           Object.entries(CharacterLines).map(([key, line]) => {
             CharacterLines[key] =
               line.length >= 2
-                ? `${line[0]}\n\\}\\C[8]「${line[1]}」\\C[0]\\{`
+                ? `${line[0]}\n\\}\\C[8]${line[1]}\\C[0]\\{`
                 : line[0];
           });
           return CharacterLines;
