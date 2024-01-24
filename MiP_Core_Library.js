@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Core Library
- * v0.5.0
+ * v0.5.1
  *
  * @author 深宵(Miyoi)
  *
@@ -189,18 +189,37 @@ MiyoiPlugins.Utility = class {
       throw new RangeError(
         `当前地图 ${$gameMap.displayName()}(${$gameMap.mapId()}) 没有找到事件 ${eventId}`
       );
-    return event
+    let relatedActorId = event
       .event()
       .pages.filter((page) => page.conditions.actorValid)
       .map((page) => page.conditions.actorId)
-      .pop();
+      .pop(); // 根据每一个事件页的 角色是否在队伍中(出现条件) 检索角色 ID;
+    if (!relatedActorId) {
+      relatedActorId = $dataActors
+        .filter((actorData) => {
+          const eventActivePageImage =
+            event.event().pages[event.findProperPageIndex()].image;
+          // console.warn(
+          //   `TODO 以图搜人 事件[${event.eventId()}] 事件页[${event.findProperPageIndex()}]`,
+          //   eventActivePageImage
+          // );
+          return (
+            actorData &&
+            actorData.characterName === eventActivePageImage.characterName &&
+            actorData.characterIndex === eventActivePageImage.characterIndex
+          );
+        })
+        .map((actorData) => actorData.id)
+        .pop(); // 根据当前激活的事件页(已经设置好)的图像反向检索角色 ID
+    }
+    return relatedActorId;
   }
 
   /**
    * @function getRelatedActorByEventId
    * @description 通过事件 ID 反向检索相关（被出现条件标记）的角色对象
    * @param {number} eventId
-   * @returns {object|undefined} 相关的角色对象
+   * @returns {any} 相关的角色对象
    */
   static getRelatedActorByEventId(eventId) {
     const actorId = MiyoiPlugins.Utility.getRelatedActorIdByEventId(eventId);
@@ -350,6 +369,8 @@ MiyoiPlugins.Utility = class {
   static setCharacterEvent(actorId, eventId, usePage = false, pageIndex = -1) {
     const targetActor = MiyoiPlugins.Utility.getActorById(actorId);
     const characterEvent = MiyoiPlugins.Utility.getEventById(eventId);
+    // Game_Event.findProperPageIndex() 检索当前 **符合条件** 的事件页
+    // 此时可能尚未触发该事件 因此有可能出现结果为 -1 导致报错
     pageIndex =
       pageIndex >= 0 ? pageIndex : characterEvent.findProperPageIndex();
     if (usePage) {
