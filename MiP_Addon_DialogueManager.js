@@ -162,15 +162,16 @@
 
         showCharacterLine(theCharacter, customLine) {
           const lineList = this._getCharacterLines(theCharacter.actorId());
-          this.debug(theCharacter.name(), "的台本", lineList);
-          // onlyLines[Math.floor(Math.random() * onlyLines.length)];
+          // this.debug(theCharacter.name(), "的台本", lineList);
           const speakerName = theCharacter.actor().meta.textColor
             ? `\\C[${
                 theCharacter.actor().meta.textColor
               }]${theCharacter.name()}\\C[0]`
             : theCharacter.name();
           let parsedText =
-            customLine.length > 0 ? customLine.join(" ") : "我是%%%。";
+            customLine.length > 0
+              ? customLine.join(" ").replace("\\n", "\n")
+              : "我是%%%。";
           const matchesKeyword = parsedText.match(/%([^%]+)%/g); // 替换台本中有的关键词简写
           if (matchesKeyword !== null) {
             parsedText = matchesKeyword
@@ -188,6 +189,7 @@
           parsedText = parsedText
             .replace(new RegExp(theCharacter.name(), "g"), speakerName) // 尝试高亮发言角色的名称
             .replace(/%%%/g, speakerName); // 替换角色名称简写(即 %%%)
+          this.debug(theCharacter.name(), "的当前台词", parsedText);
           $gameMessage.add(`\\}「${speakerName}」\\{\n${parsedText}`);
           return true;
         }

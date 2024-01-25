@@ -297,21 +297,11 @@
           return true;
         }
 
-        unlockCharacter(mapId, eventId) {
+        unlockCharacter(eventId) {
           this._clearLockdown(
             MiyoiPlugins.Utility.getEventById(eventId).event().meta.cid
           ); // 清理指定的禁闭室数据
-          this.log(
-            "TODO 取消禁闭 当前事件数据",
-            MiyoiPlugins.Utility.getEventById(eventId).event(),
-            `独立开关 ${mapId}, ${eventId}, ${this._config["lockdown_event_self_switch_choice"]} =`,
-            $gameSelfSwitches.value([
-              mapId,
-              eventId,
-              this._config["lockdown_event_self_switch_choice"],
-            ])
-          );
-          return false;
+          return true;
         }
 
         punishCharacter() {
@@ -363,7 +353,7 @@
             (event) =>
               event.event().meta.event ===
                 thisPluginInstance._config["lockdown_event_note_tag"] &&
-              event.event().meta.cid in thisPluginInstance._lockdownCells
+              thisPluginInstance._lockdownCells[event.event().meta.cid]
           ) // 所有禁闭室角色事件
           .map((event) => {
             const actor = MiyoiPlugins.Utility.getActorById(
@@ -438,7 +428,7 @@
               );
               break;
             case "unlockCharacter":
-              thisPluginInstance.unlockCharacter(this._mapId, this.eventId());
+              thisPluginInstance.unlockCharacter(this.eventId());
               break;
             case "punishCharacter":
               thisPluginInstance.punishCharacter();
