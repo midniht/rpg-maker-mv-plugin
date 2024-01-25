@@ -98,10 +98,12 @@ MiyoiPlugins.Utility = class {
    * @returns {any[]} 角色格式化后的当前状态
    */
   static debugActorStates(allActor = false) {
-    const actorList = allActor ? $gameActors._data : $gameParty.allMembers();
+    const actorList = allActor
+      ? $gameActors._data.filter((actor) => actor)
+      : $gameParty.allMembers();
     return actorList.map((actor) => {
       return {
-        actor: `[${actor.actorId()}${actor.name()}`,
+        actor: `[${actor.actorId()}]${actor.name()}`,
         state: actor
           .states()
           .map((state) => state.name)
@@ -570,9 +572,7 @@ MiyoiPlugins.AddonBase = class {
             MiyoiPlugins.getConfig("leave_party_skill")
       ) // 遍历全队 筛选出所有上次使用的菜单技能是「离开队伍」的角色
       .map((actor) => {
-        MiyoiPlugins.Utility.getActorById(actor.actorId()).eraseState(
-          this._config["in_party_state"]
-        ); // 离队前解除状态
+        actor.eraseState(MiyoiPlugins.getConfig("in_party_state")); // 离队前解除状态
         $gameParty.removeActor(actor.actorId()); // 执行离队操作
       });
     return true;
