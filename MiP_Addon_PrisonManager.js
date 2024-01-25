@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Prison Manager
- * v0.7.4
+ * v0.7.5
  *
  * @author 深宵(Miyoi)
  *
@@ -52,6 +52,18 @@
  * @type combo
  * @option is_prisoner
  * @default is_prisoner
+ *
+ * @param 「切换监禁状态」技能
+ * @parent 监牢
+ * @desc 绑定表示「切换监禁状态」的「（菜单画面使用场合）技能」。
+ * @type skill
+ * @default
+ *
+ * @param 「切换监禁状态」物品
+ * @parent 监牢
+ * @desc 绑定表示「切换监禁状态」的「（菜单画面使用场合）物品」。
+ * @type item
+ * @default
  *
  * @param 禁闭室
  * @type select
@@ -115,7 +127,7 @@
         constructor(config = {}) {
           super({
             name: "MiP_Addon_PrisonManager",
-            version: "0.7.4",
+            version: "0.7.5",
           });
           this._config["imprison_state"] = Number(
             config["Imprison State"] || config["「监禁中」状态"]
@@ -125,6 +137,12 @@
             config["显示「监禁中」角色的独立开关"];
           this._config["prisoner_event_note_tag"] =
             config["Prisoner Event Note Tag"] || config["监牢角色事件备注标记"];
+          this._config["switch_prison_skill"] = Number(
+            config["Switch Prison Skill"] || config["「切换监禁状态」技能"]
+          );
+          this._config["switch_prison_item"] = Number(
+            config["Switch Prison Item"] || config["「切换监禁状态」物品"]
+          );
           this._config["lockdown_event_self_switch_choice"] =
             config["Lockdown Event Self Switch Choice"] ||
             config["显示「禁闭中」角色的独立开关"];
@@ -157,18 +175,21 @@
          * @returns {boolean} 是否已启用独立开关
          */
         handleShowCharacter(mapId, eventId, atPrison = false) {
+          const effectiveSelfSwitchChoice = atPrison
+            ? this._config["prisoner_event_self_switch_choice"]
+            : MiyoiPlugins.getConfig("character_event_self_switch_choice");
           if (this._canShowCharacter(eventId, atPrison)) {
-            const effectiveSelfSwitchChoice = atPrison
-              ? this._config["prisoner_event_self_switch_choice"]
-              : MiyoiPlugins.getConfig("character_event_self_switch_choice");
             $gameSelfSwitches.setValue(
               [mapId, eventId, effectiveSelfSwitchChoice],
               true
             ); // 打开当前事件的独立开关让下一页生效
             return true;
-          } else {
-            $gameMap.eraseEvent(eventId); // 暂时消除事件 防止自动执行的事件陷入死循环
           }
+          $gameSelfSwitches.setValue(
+            [mapId, eventId, effectiveSelfSwitchChoice],
+            false
+          ); // 打开当前事件的独立开关让下一页生效
+          $gameMap.eraseEvent(eventId); // 暂时消除事件 防止自动执行的事件陷入死循环
           return false;
         }
 
@@ -387,6 +408,28 @@
           "禁闭室图像:",
           newLockdownImages
         );
+      };
+
+      const old_Game_Action_apply = Game_Action.prototype.apply; // 临时保存之前的技能释放
+      // 重载技能释放
+      Game_Action.prototype.apply = function (targetActor) {
+        if (
+          (this.isSkill() &&
+            this.item().id ===
+              thisPluginInstance._config["switch_prison_skill"]) ||
+          (this.isItem() &&
+            this.item().id === thisPluginInstance._config["switch_prison_item"])
+        ) {
+          if (targetActor.actorId() === $gameParty.leader().actorId()) return;
+          const imprisonState = thisPluginInstance._config["imprison_state"];
+          if (targetActor._states.includes(imprisonState)) {
+            targetActor.eraseState(imprisonState); // 解除监禁状态
+          } else {
+            targetActor.addState(imprisonState); // 附加监禁状态
+          }
+          return;
+        }
+        old_Game_Action_apply.call(this, targetActor);
       };
 
       const old_Game_Interpreter_PluginCommand =

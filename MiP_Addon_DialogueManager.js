@@ -224,7 +224,7 @@
           switch (args[0]) {
             case "say":
               thisPluginInstance.showDialogue(this.eventId(), ...args.slice(1));
-              this.setWaitMode("message");
+              this.setWaitMode("message"); // rpg_objects.js Game_Interpreter.prototype.updateWaitMode
               // TODO 跟在事件执行 显示文字 的表现不一致
               // 无法和事件里的 显示选项 直接结合
               break;
