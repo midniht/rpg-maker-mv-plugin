@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Dialogue Manager
- * v0.7.0
+ * v0.7.1
  *
  * @author 深宵(Miyoi)
  *
@@ -37,7 +37,7 @@
           "必需的核心依赖库缺失",
           "请先启用核心依赖插件 MiP_Core_Library",
           "(或者关闭 / 卸载本插件)",
-        ].join("<br>")
+        ].join("<br>"),
       );
     }
   };
@@ -52,10 +52,11 @@
          */
         constructor(config = {}) {
           super({
-            name: "MiP_Addon_DialogueManager",
-            version: "0.5.0",
+            name: "MiP DialogueManager",
+            version: "0.7.1",
           });
-          this._config["portrait_prefix"] =
+          this._config.portrait_prefix =
+            // biome-ignore lint/complexity/useLiteralKeys: <explanation>
             config["Portrait File Prefix"] || config["立绘图片文件名前缀"];
           this._characterData = {}; // 游戏角色数据
           this._imageCacheOffset = 77; // 图片 ID 偏移量 防止和其他图片冲突
@@ -65,18 +66,18 @@
         showCharacterPortrait(theCharacter, differentialSuffix = "") {
           const parametersArray = Object.entries(theCharacter.actor().meta)
             .filter(([key, _]) =>
-              key.toString().toLowerCase().startsWith("image")
+              key.toString().toLowerCase().startsWith("image"),
             )
             .filter(([_, value]) => value.split(",")[0] === differentialSuffix)
             .map(([_, value]) =>
               value
                 .split(",")
                 .slice(1)
-                .map((argv) => Number(argv))
+                .map((argv) => Number(argv)),
             )
             .pop();
           const pictureFilename = [
-            this._config["portrait_prefix"],
+            this._config.portrait_prefix,
             theCharacter.name(),
             differentialSuffix,
           ]
@@ -88,7 +89,7 @@
                 `${this.addonName}:`,
                 `没有找到指定(${differentialSuffix})的立绘图片`,
                 `/img/pictures/${pictureFilename}.png`,
-              ].join("<br>")
+              ].join("<br>"),
             );
           }
           const pictureParameters = {
@@ -119,7 +120,7 @@
             pictureParameters.scaleX, // 缩放率的横向宽度 (单位百分比)
             pictureParameters.scaleY, // 缩放率的纵向高度 (单位百分比)
             pictureParameters.opacity, // 合成方式的不透明度 (0 - 255)
-            pictureParameters.blendMode // 合成方式: 0(正常), 1(叠加), 2(正片叠底), 3(滤色)
+            pictureParameters.blendMode, // 合成方式: 0(正常), 1(叠加), 2(正片叠底), 3(滤色)
           );
           return true;
         }
@@ -140,7 +141,7 @@
           const CharacterLines = {};
           Object.entries(targetActor.actor().meta)
             .filter(([key, _]) =>
-              key.toString().toLowerCase().startsWith("line")
+              key.toString().toLowerCase().startsWith("line"),
             )
             .map(([key, line]) => {
               if (key.toLowerCase().endsWith("_raw")) {
@@ -181,9 +182,9 @@
                 (accumulator, currentKeyword) =>
                   accumulator.replace(
                     `%${currentKeyword}%`,
-                    lineList[currentKeyword]
+                    lineList[currentKeyword],
                   ),
-                parsedText
+                parsedText,
               );
           }
           parsedText = parsedText
@@ -197,6 +198,10 @@
         showDialogue(eventId, ...args) {
           const currentActor =
             MiyoiPlugins.Utility.getRelatedActorByEventId(eventId);
+          if (!currentActor) {
+            this.error(`从事件 ${eventId} 相关角色 currentActor`, currentActor);
+            throw new Error(`从事件 ${eventId} 检索相关角色失败`);
+          }
           this.clearCharacterPortrait(); // 清除之前的立绘
           this.showCharacterPortrait(currentActor, args[0]); // 显示当前的立绘
           this.showCharacterLine(currentActor, [...args.slice(1)]); // 显示台词
@@ -205,7 +210,7 @@
       }
 
       const thisPluginParameters = PluginManager.parameters(
-        "MiP_Addon_DialogueManager"
+        "MiP_Addon_DialogueManager",
       ); // 加载本插件预设好的参数
       const thisPluginInstance = new DialogueManager(thisPluginParameters); // 实例化本插件定义好的功能类
       $.dialogueManager = thisPluginInstance; // 挂载到全局窗口
@@ -219,7 +224,7 @@
         if (command === "MiP_Dialogue") {
           if (!args || args.length < 1)
             throw new RangeError(
-              `${thisPluginInstance.addonName}: 插件命令的参数数量错误 ${args}`
+              `${thisPluginInstance.addonName}: 插件命令的参数数量错误 ${args}`,
             );
           switch (args[0]) {
             case "say":
@@ -237,6 +242,7 @@
           }
         }
       };
+      // biome-ignore lint/suspicious/noAssignInExpressions: <explanation>
     })(MiyoiPlugins.addons || (MiyoiPlugins.addons = {}));
   }
 })();

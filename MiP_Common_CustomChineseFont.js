@@ -28,10 +28,11 @@
  * @default
  */
 
-(function () {
+(() => {
   // 获取插件参数指定的字体文件名
   const CustomGameFontFile = PluginManager.parameters(
-    "MiP_Common_CustomChineseFont"
+    "MiP_Common_CustomChineseFont",
+    // biome-ignore lint/complexity/useLiteralKeys: <explanation>
   )["指定字体文件"];
 
   // 如果设置了该参数
@@ -45,12 +46,11 @@
     document.head.appendChild(newFontStyleElement);
 
     // 劫持获取默认字体的函数: 设置为新的自定义字体
-    Window_Base.prototype.standardFontFace = function () {
-      return "CustomGameFont, SimHei, Heiti TC, sans-serif";
-    };
+    Window_Base.prototype.standardFontFace = () =>
+      "CustomGameFont, SimHei, Heiti TC, sans-serif";
 
     console.debug(
-      `MiP_Common_CustomChineseFont [自定义中文字体] 新的字体 ${CustomGameFontFile} 已应用`
+      `MiP_Common_CustomChineseFont [自定义中文字体] 新的字体 ${CustomGameFontFile} 已应用`,
     );
   }
 })();

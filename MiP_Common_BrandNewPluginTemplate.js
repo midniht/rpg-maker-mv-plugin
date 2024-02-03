@@ -223,7 +223,7 @@ class BrandNewPluginDemo {
     // 加载参数
     const temp = Object.entries(config);
     this._config = {};
-    for (let [key, value] of temp) {
+    for (const [key, value] of temp) {
       this._config[key] = value;
     }
 
@@ -235,7 +235,7 @@ class BrandNewPluginDemo {
    * @returns 简单测试
    */
   test() {
-    this.log(`当前配置为`, this._config);
+    this.log("当前配置为", this._config);
     return "测试完成";
   }
 }
@@ -244,9 +244,9 @@ class BrandNewPluginDemo {
  * @function 自动执行的业务逻辑放进匿名闭包
  * @description 内部代码运行在局部的作用域 防止本插件内部的变量污染到全局
  */
-(function () {
+(() => {
   const thisPluginParameters = PluginManager.parameters(
-    "MiP_Common_BrandNewPluginTemplate"
+    "MiP_Common_BrandNewPluginTemplate",
   ); // 加载本插件预设好的参数
   const thisPluginInstance = new BrandNewPluginDemo(thisPluginParameters); // 实例化本插件定义好的功能类
   thisPluginInstance.test(); // 测试实例
