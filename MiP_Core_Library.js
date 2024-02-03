@@ -4,7 +4,7 @@
 
 /*:
  * @plugindesc Miyoi's Plugin - Core Library
- * v0.5.4
+ * v0.5.5
  *
  * @author 深宵(Miyoi)
  *
@@ -168,10 +168,13 @@ MiyoiPlugins.Utility = class {
           MiyoiPlugins.Utility.getRelatedActorIdByEventId(eventData.id) >= 0,
       )
       .map((eventData) => {
+        const actorId = MiyoiPlugins.Utility.getRelatedActorIdByEventId(
+          eventData.id,
+        );
+        const actorName = MiyoiPlugins.Utility.getActorNameById(actorId);
         return {
-          id: eventData.id,
-          name: eventData.name,
-          actorName: MiyoiPlugins.Utility.getActorNameById(eventData.id),
+          event: `[${eventData.id}]${eventData.name}`,
+          actor: `[${actorId}]${actorName}`,
           pagesImage: eventData.pages
             .map((page) => {
               const pageImageData = {
@@ -241,6 +244,7 @@ MiyoiPlugins.Utility = class {
     if (actorData) {
       return actorData.name;
     }
+    console.warn(`没有找到 actor[${actorId}] 的名称`);
     return undefined;
   }
 
@@ -299,10 +303,11 @@ MiyoiPlugins.Utility = class {
   /**
    * @function getRelatedActorIdByEventId
    * @description 通过事件 ID 反向检索相关（被出现条件标记）的角色 ID
-   * @param {number} eventId
+   * @param {number} eventId 事件 ID
+   * @param {boolean} [useCache=false] 使用插件缓存的数据
    * @returns {number} 相关的角色 ID
    */
-  static getRelatedActorIdByEventId(eventId) {
+  static getRelatedActorIdByEventId(eventId, useCache = false) {
     const eventData = $dataMap.events[eventId];
     if (!eventData) {
       throw new RangeError(
@@ -311,29 +316,40 @@ MiyoiPlugins.Utility = class {
         }(${$gameMap.mapId()}) 没有找到事件 ${eventId}`,
       );
     }
-    let relatedActorId = eventData.pages
-      .filter((page) => page.conditions.actorValid)
-      .map((page) => page.conditions.actorId)
-      .pop(); // 根据每一个事件页的 角色是否在队伍中(出现条件) 检索角色 ID;
-    const event = $gameMap.event(eventId);
-    if (!relatedActorId && event && event.findProperPageIndex() >= 0) {
-      relatedActorId = $dataActors
-        .filter((actorData) => {
-          const eventActivePageImage =
-            event.event().pages[event.findProperPageIndex()].image;
-          // console.warn(
-          //   `TODO 以图搜人 事件[${event.eventId()}] 事件页[${event.findProperPageIndex()}]`,
-          //   eventActivePageImage
-          // );
-          return (
-            actorData &&
-            actorData.characterName === eventActivePageImage.characterName &&
-            actorData.characterIndex === eventActivePageImage.characterIndex
-          );
-        })
-        .map((actorData) => actorData.id)
-        .pop(); // 根据当前激活的事件页(已经设置好)的图像反向检索角色 ID
-      console.warn("TODO 以图搜人 检索到 actorId", relatedActorId);
+    let relatedActorId = undefined;
+    const currentMapDataCache =
+      MiyoiPlugins._data.actorBindEvents[$gameMap.mapId()];
+    if (currentMapDataCache && useCache) {
+      const eventBindData = currentMapDataCache.events
+        .filter((eventBindData) => eventBindData.eventId === eventId)
+        .pop();
+      if (eventBindData) {
+        relatedActorId = eventBindData.actorId;
+      }
+    } else {
+      relatedActorId = eventData.pages
+        .filter((page) => page.conditions.actorValid)
+        .map((page) => page.conditions.actorId)
+        .pop(); // 根据每一个事件页的 角色是否在队伍中(出现条件) 检索角色 ID;
+      const event = $gameMap.event(eventId);
+      if (!relatedActorId && event && event.findProperPageIndex() >= 0) {
+        relatedActorId = $dataActors
+          .filter((actorData) => {
+            const eventActivePageImage =
+              event.event().pages[event.findProperPageIndex()].image;
+            // console.warn(
+            //   `TODO 以图搜人 事件[${event.eventId()}] 事件页[${event.findProperPageIndex()}]`,
+            //   eventActivePageImage
+            // );
+            return (
+              actorData &&
+              actorData.characterName === eventActivePageImage.characterName &&
+              actorData.characterIndex === eventActivePageImage.characterIndex
+            );
+          })
+          .map((actorData) => actorData.id)
+          .pop(); // 根据当前激活的事件页(已经设置好)的图像反向检索角色 ID
+      }
     }
     return relatedActorId ? relatedActorId : -1;
   }
@@ -404,7 +420,8 @@ MiyoiPlugins.Utility = class {
       characterEventData.pages[validPageIndex].image.characterIndex =
         targetActorData.characterIndex;
       characterEventData.pages[validPageIndex].image.pattern = 1; // 默认第二帧
-      return characterEventData.pages[validPageIndex];
+      $dataMap.events[eventId] = characterEventData;
+      return $dataMap.events[eventId].pages[validPageIndex];
     }
     const characterEvent = MiyoiPlugins.Utility.getEventById(eventId);
     if (!characterEvent)
@@ -412,8 +429,8 @@ MiyoiPlugins.Utility = class {
         `当前地图 ${$gameMap.displayName()} 没有找到 事件[${eventId}]`,
       );
     characterEvent.setImage(
-      characterEvent.characterName(),
-      characterEvent.characterIndex(),
+      targetActorData.characterName,
+      targetActorData.characterIndex,
     ); // 让角色事件更新图像
     // characterEvent.refresh(); // TODO 貌似没起作用
     // Game_Event.findProperPageIndex() 检索当前 **符合条件** 的事件页
@@ -771,7 +788,7 @@ MiyoiPlugins.getConfig = function (configName) {
             })
             .filter((actorEvent) => actorEvent),
         };
-        thisPluginInstance.warn("角色事件 插件自带数据库 初始化", {
+        thisPluginInstance.debug("进入新地图场景 缓存角色事件的绑定关系", {
           ...MiyoiPlugins._data.actorBindEvents, // 简单深拷贝
         });
       }
